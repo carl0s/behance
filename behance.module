@@ -57,7 +57,7 @@ function behance_admin($settings = NULL){
 }
 
 function behance_node_presave($node) {
-  if($node->type == 'behance' && $node->op == 'Save'):
+  if($node->type == 'behance' && $node->is_new == true):
     // DEFINING PHP VARIABLES FROM DRUPAL VARIABLES
 
     $behance_app_id = variable_get('behance_app_id','');
@@ -114,5 +114,6 @@ function behance_node_presave($node) {
       node_save($node);
     }
   endif;
+
 }
 
