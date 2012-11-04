@@ -1,0 +1,120 @@
+<?php
+require_once('lib/Be/Api.php');
+
+function behance_menu(){
+  $items = array();
+
+  $items['admin/config/behance'] = array(
+      'title' => 'Behance API settings',
+      'description' => 'Behance API settings page for APP ID and API key',
+      'position' => 'right',
+      'weight' => -100,
+      'page callback' => 'system_admin_menu_block_page',
+      'access arguments' => array('administer site configuration'),
+      'file' => 'system.admin.inc',
+      'file path' => drupal_get_path('module', 'system'),
+    );
+
+  $items['admin/config/behance/settings'] = array(
+    'title' => 'Behance API settings',
+    'description' => 'Behance API settings page for APP ID and API key',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('behance_admin'),
+    'access arguments' => array('administer behance settings'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
+}
+
+function behance_admin($settings = NULL){
+
+  // Merge default settings into the stored settings array.
+  $settings = (array) $settings + array(
+    'behance_app_id' => variable_get('behance_app_id',''),
+    'behance_api_key' => variable_get('behance_api_key',''),
+  );
+
+  $form = array();
+
+  $form['behance_app_id'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Behance APP ID'),
+    '#description' => t('Insert your Behance APP ID, you can get one here http://www.behance.net/dev'),
+    '#default_value' => variable_get('behance_app_id',''),
+    '#required'=> TRUE,
+  );
+
+  $form['behance_api_key'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Behance API key'),
+    '#description' => t('Please insert your Behance API key for your app'),
+    '#default_value' => variable_get('behance_api_key',''),
+    '#required'=> TRUE,
+  );
+
+  return system_settings_form($form);
+}
+
+function behance_node_presave($node) {
+  if($node->type == 'behance'):
+    // DEFINING PHP VARIABLES FROM DRUPAL VARIABLES
+
+    $behance_app_id = variable_get('behance_app_id','');
+    $behance_api_key = variable_get('behance_api_key','');
+
+    if(empty($behance_app_id) && empty($behance_api_key)):
+      drupal_set_message(t('Your APP ID or your API key for Behance is empty.'), 'error');
+    endif;
+
+
+    $be_api = new Be_Api($behance_app_id, $behance_api_key );
+    $be_api_single = new Be_Api($behance_app_id, $behance_api_key );
+    $be_api_result = $be_api->getUserProjects($node->field_behance_user[LANGUAGE_NONE][0]['value']);
+
+    if(empty($be_api_result)):
+      drupal_set_message(t('Something is wrong with API calls, verify your credential or your API call limit.'), 'error');
+    endif;
+
+    // FROM STACKEXCHANGE SAVING IMAGES
+    foreach ($be_api_result as $project) {
+      $node = new stdClass;
+      $node->type = 'behance_project';
+      $node->title = $project->name;
+      $node->status= 0;
+      $node->field_behance_id[LANGUAGE_NONE][0]['value'] = $project->id;
+      $node->field_creative_field[LANGUAGE_NONE][]['value'] = $project->fields;
+      // PER PROJECT INFO TO BE UPDATED
+      $be_api_single_result = $be_api_single->getProject($project->id);
+      $node->body = $be_api_single_result->description;
+      $i=0;
+      foreach($be_api_single_result->modules as $module):
+        switch ($module->type) {
+          case 'image':
+            $node->field_modules[LANGUAGE_NONE][$i]['value'] = $module->src;
+          break;
+          case 'embed':
+            $node->field_modules[LANGUAGE_NONE][$i]['value'] = $module->embed;
+          break;
+          case 'text':
+            $node->field_modules[LANGUAGE_NONE][$i]['value'] = $module->text;
+          break;
+          default:
+            $node->field_modules[LANGUAGE_NONE][$i]['value'] = $module->src;
+          break;
+        }
+        $i++;
+      endforeach;
+      $i=0;
+      // END OF PER PROJECT SECTION
+      $node->field_url[LANGUAGE_NONE][0]['value'] = $project->url;
+      $node->field_views[LANGUAGE_NONE][]['value'] = $project->stats->views;
+      foreach($project->covers as $covers):
+        $node->field_covers[LANGUAGE_NONE][]['value'] = $covers;
+      endforeach;
+      $node->field_appreciation[LANGUAGE_NONE][]['value'] = $project->stats->appreciations;
+      node_save($node);
+    }
+  endif;
+}
+

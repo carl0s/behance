@@ -1,0 +1,7 @@
+name = Behance
+description = "Behance integration"
+core = 7.x
+package = n3
+files[] = behance.test
+
+configure = admin/config/behance
