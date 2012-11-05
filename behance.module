@@ -90,7 +90,8 @@ function behance_node_presave($node) {
       $node->field_creative_field[LANGUAGE_NONE][]['value'] = $project->fields;
       // PER PROJECT INFO TO BE UPDATED
       $be_api_single_project = $be_api->getProject($project->id);
-      $node->body = $be_api_single_project->description;
+      $node->body['und'][0]['value'] = $be_api_single_project->description;
+
       foreach($be_api_single_project->modules as $module):
         switch ($module->type) {
           case 'image':
