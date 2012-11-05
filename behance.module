@@ -1,4 +1,10 @@
 <?php
+/*
+ * Author: Carlo "carl0s" Frinolli
+ * Company: nois3lab
+ * This code is fully released under GPL v2 as per license.txt
+ */
+
 require_once('lib/Be/Api.php');
 
 function behance_menu(){
