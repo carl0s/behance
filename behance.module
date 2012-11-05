@@ -83,6 +83,9 @@ function behance_node_presave($node) {
       $node->type = 'behance_project';
       $node->title = $project->name;
       $node->status= 0;
+      $node->uid = 1;
+      $node->name = 'admin';
+      $node->language = 'und';
       $node->field_behance_id[LANGUAGE_NONE][0]['value'] = $project->id;
       $node->field_creative_field[LANGUAGE_NONE][]['value'] = $project->fields;
       // PER PROJECT INFO TO BE UPDATED
