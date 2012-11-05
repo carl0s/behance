@@ -11,23 +11,23 @@ function behance_menu(){
   $items = array();
 
   $items['admin/config/behance'] = array(
-      'title' => 'Behance API settings',
-      'description' => 'Behance API settings page for APP ID and API key',
-      'position' => 'right',
-      'weight' => -100,
-      'page callback' => 'system_admin_menu_block_page',
+      'title'            => 'Behance API settings',
+      'description'      => 'Behance API settings page for APP ID and API key',
+      'position'         => 'right',
+      'weight'           => -100,
+      'page callback'    => 'system_admin_menu_block_page',
       'access arguments' => array('administer site configuration'),
-      'file' => 'system.admin.inc',
-      'file path' => drupal_get_path('module', 'system'),
+      'file'             => 'system.admin.inc',
+      'file path'        => drupal_get_path('module', 'system'),
     );
 
   $items['admin/config/behance/settings'] = array(
-    'title' => 'Behance API settings',
-    'description' => 'Behance API settings page for APP ID and API key',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('behance_admin'),
+    'title'            => 'Behance API settings',
+    'description'      => 'Behance API settings page for APP ID and API key',
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('behance_admin'),
     'access arguments' => array('administer behance settings'),
-    'type' => MENU_NORMAL_ITEM,
+    'type'             => MENU_NORMAL_ITEM,
   );
 
   return $items;
@@ -37,51 +37,51 @@ function behance_admin($settings = NULL){
 
   // Merge default settings into the stored settings array.
   $settings = (array) $settings + array(
-    'behance_app_id' => variable_get('behance_app_id',''),
+    'behance_app_id'  => variable_get('behance_app_id',''),
     'behance_api_key' => variable_get('behance_api_key',''),
   );
 
   $form = array();
 
   $form['behance_app_id'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Behance APP ID'),
-    '#description' => t('Insert your Behance APP ID, you can get one here http://www.behance.net/dev'),
+    '#type'          => 'textfield',
+    '#title'         => t('Behance APP ID'),
+    '#description'   => t('Insert your Behance APP ID, you can get one here http://www.behance.net/dev'),
     '#default_value' => variable_get('behance_app_id',''),
-    '#required'=> TRUE,
+    '#required'      => TRUE,
   );
 
   $form['behance_api_key'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Behance API key'),
-    '#description' => t('Please insert your Behance API key for your app'),
+    '#type'          => 'textfield',
+    '#title'         => t('Behance API key'),
+    '#description'   => t('Please insert your Behance API key for your app'),
     '#default_value' => variable_get('behance_api_key',''),
-    '#required'=> TRUE,
+    '#required'      => TRUE,
   );
 
   return system_settings_form($form);
 }
 
 function behance_node_presave($node) {
-  if($node->type == 'behance' && $node->is_new == true):
-    // DEFINING PHP VARIABLES FROM DRUPAL VARIABLES
+  // DEFINING PHP VARIABLES FROM DRUPAL VARIABLES
+  $behance_app_id  = variable_get('behance_app_id','');
+  $behance_api_key = variable_get('behance_api_key','');
 
-    $behance_app_id = variable_get('behance_app_id','');
-    $behance_api_key = variable_get('behance_api_key','');
+  // API CALL TO BEHANCE ACCORDING TO DOCS
+  $be_api = new Be_Api($behance_app_id, $behance_api_key );
+  $be_api_projects = $be_api->getUserProjects($node->field_behance_user[LANGUAGE_NONE][0]['value']);
+  if($node->type == 'behance' && ($node->is_new == true || $node->timestamp < $be_api_projects->projects->modified_on)) {
 
-    if(empty($behance_app_id) || empty($behance_api_key)):
+    // CHECKING ERRORS
+    if(empty($behance_app_id) || empty($behance_api_key)) {
       drupal_set_message(t('Your APP ID or your API key for Behance is empty.'), 'error');
       return;
-    endif;
+    }
 
-
-    $be_api = new Be_Api($behance_app_id, $behance_api_key );
-    $be_api_projects = $be_api->getUserProjects($node->field_behance_user[LANGUAGE_NONE][0]['value']);
-
-    if(empty($be_api_projects)):
+    if(empty($be_api_projects)) {
       drupal_set_message(t('Something is wrong with API calls, verify your credential or your API call limit.'), 'error');
       return;
-    endif;
+    }
 
     // FROM STACKEXCHANGE SAVING IMAGES
     foreach ($be_api_projects as $project) {
@@ -123,7 +123,7 @@ function behance_node_presave($node) {
       $node->field_appreciation[LANGUAGE_NONE][]['value'] = $project->stats->appreciations;
       node_save($node);
     }
-  endif;
+  }
 
 }
 
