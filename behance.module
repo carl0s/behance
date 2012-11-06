@@ -63,67 +63,72 @@ function behance_admin($settings = NULL){
 }
 
 function behance_node_presave($node) {
+  // filefield_sources_save_file()
+  // var_dump($node);
+  // die();
   // DEFINING PHP VARIABLES FROM DRUPAL VARIABLES
   $behance_app_id  = variable_get('behance_app_id','');
   $behance_api_key = variable_get('behance_api_key','');
 
   // API CALL TO BEHANCE ACCORDING TO DOCS
   $be_api = new Be_Api($behance_app_id, $behance_api_key );
-  $be_api_projects = $be_api->getUserProjects($node->field_behance_user[LANGUAGE_NONE][0]['value']);
-  if($node->type == 'behance' && ($node->is_new == true || $node->timestamp < $be_api_projects->projects->modified_on)) {
+  $be_api_projects = $be_api->getUserProjects($node->title);
+  foreach($be_api_projects as $single_project):
+    if($node->type == 'behance' && ($node->is_new == true || $node->timestamp < $single_project->modified_on)) {
 
-    // CHECKING ERRORS
-    if(empty($behance_app_id) || empty($behance_api_key)) {
-      drupal_set_message(t('Your APP ID or your API key for Behance is empty.'), 'error');
-      return;
+      // CHECKING ERRORS
+      if(empty($behance_app_id) || empty($behance_api_key)) {
+        drupal_set_message(t('Your APP ID or your API key for Behance is empty.'), 'error');
+        return;
+      }
+
+      if(empty($be_api_projects)) {
+        drupal_set_message(t('Something is wrong with API calls, verify your credential or your API call limit.'), 'error');
+        return;
+      }
+
+      // FROM STACKEXCHANGE SAVING IMAGES
+      foreach ($be_api_projects as $project) {
+        $node = new stdClass;
+        $node->type = 'behance_project';
+        $node->title = $project->name;
+        $node->status= 0;
+        $node->uid = 1;
+        $node->name = 'admin';
+        $node->language = 'und';
+        $node->field_behance_id[LANGUAGE_NONE][0]['value'] = $project->id;
+        $node->field_creative_fields[LANGUAGE_NONE][]['value'] = $project->fields;
+        // PER PROJECT INFO TO BE UPDATED
+        $be_api_single_project = $be_api->getProject($project->id);
+        $node->body['und'][0]['value'] = $be_api_single_project->description;
+
+        foreach($be_api_single_project->modules as $module):
+          switch ($module->type) {
+            case 'image':
+              $node->field_modules[LANGUAGE_NONE][]['value'] = $module->src;
+            break;
+            case 'embed':
+              $node->field_modules[LANGUAGE_NONE][]['value'] = $module->embed;
+            break;
+            case 'text':
+              $node->field_modules[LANGUAGE_NONE][]['value'] = $module->text;
+            break;
+            default:
+              $node->field_modules[LANGUAGE_NONE][]['value'] = $module->src;
+            break;
+          }
+        endforeach;
+        // END OF PER PROJECT SECTION
+        $node->field_url[LANGUAGE_NONE][0]['value'] = $project->url;
+        $node->field_views[LANGUAGE_NONE][]['value'] = $project->stats->views;
+        foreach($project->covers as $covers):
+          $node->field_covers[LANGUAGE_NONE][]['value'] = $covers;
+        endforeach;
+        $node->field_appreciation[LANGUAGE_NONE][]['value'] = $project->stats->appreciations;
+        node_save($node);
+      }
     }
-
-    if(empty($be_api_projects)) {
-      drupal_set_message(t('Something is wrong with API calls, verify your credential or your API call limit.'), 'error');
-      return;
-    }
-
-    // FROM STACKEXCHANGE SAVING IMAGES
-    foreach ($be_api_projects as $project) {
-      $node = new stdClass;
-      $node->type = 'behance_project';
-      $node->title = $project->name;
-      $node->status= 0;
-      $node->uid = 1;
-      $node->name = 'admin';
-      $node->language = 'und';
-      $node->field_behance_id[LANGUAGE_NONE][0]['value'] = $project->id;
-      $node->field_creative_field[LANGUAGE_NONE][]['value'] = $project->fields;
-      // PER PROJECT INFO TO BE UPDATED
-      $be_api_single_project = $be_api->getProject($project->id);
-      $node->body['und'][0]['value'] = $be_api_single_project->description;
-
-      foreach($be_api_single_project->modules as $module):
-        switch ($module->type) {
-          case 'image':
-            $node->field_modules[LANGUAGE_NONE][]['value'] = $module->src;
-          break;
-          case 'embed':
-            $node->field_modules[LANGUAGE_NONE][]['value'] = $module->embed;
-          break;
-          case 'text':
-            $node->field_modules[LANGUAGE_NONE][]['value'] = $module->text;
-          break;
-          default:
-            $node->field_modules[LANGUAGE_NONE][]['value'] = $module->src;
-          break;
-        }
-      endforeach;
-      // END OF PER PROJECT SECTION
-      $node->field_url[LANGUAGE_NONE][0]['value'] = $project->url;
-      $node->field_views[LANGUAGE_NONE][]['value'] = $project->stats->views;
-      foreach($project->covers as $covers):
-        $node->field_covers[LANGUAGE_NONE][]['value'] = $covers;
-      endforeach;
-      $node->field_appreciation[LANGUAGE_NONE][]['value'] = $project->stats->appreciations;
-      node_save($node);
-    }
-  }
+  endforeach;
 
 }
 
