@@ -62,6 +62,17 @@ function behance_admin($settings = NULL){
   return system_settings_form($form);
 }
 
+/**
+* Create a taxonomy term and return the tid.
+*/
+function custom_create_taxonomy_term($name, $vid) {
+  $term = new stdClass();
+  $term->name = $name;
+  $term->vid = $vid;
+  taxonomy_term_save($term);
+  return $term->tid;
+}
+
 function behance_node_presave($node) {
   // filefield_sources_save_file()
   // var_dump($node);
@@ -97,7 +108,13 @@ function behance_node_presave($node) {
         $node->name = 'admin';
         $node->language = 'und';
         $node->field_behance_id[LANGUAGE_NONE][0]['value'] = $project->id;
-        $node->field_creative_fields[LANGUAGE_NONE][]['value'] = $project->fields;
+        //$node->field_creative_fields[LANGUAGE_NONE][]['value'] = $project->fields;
+        //die(var_dump($project->fields));
+        $vid = db_query("SELECT vid FROM {taxonomy_vocabulary} WHERE machine_name = 'creative_fields'")->fetchField();
+        foreach ($project->fields as $field) {
+          $tid = custom_create_taxonomy_term($field, $vid);
+          $node->field_creative_fields['und'][0] = array('tid' => $tid);
+        }
         // PER PROJECT INFO TO BE UPDATED
         $be_api_single_project = $be_api->getProject($project->id);
         $node->body['und'][0]['value'] = $be_api_single_project->description;
