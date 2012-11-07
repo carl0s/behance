@@ -73,6 +73,27 @@ function custom_create_taxonomy_term($name, $vid) {
   return $term->tid;
 }
 
+/**
+* Helper function to dynamically get the tid from the term_name
+*
+* @param $term_name Term name
+* @param $vocabulary_name Name of the vocabulary to search the term in
+*
+* @return Term id of the found term or else FALSE
+*/
+function _get_term_from_name($term_name, $vocabulary_name) {
+  if ($vocabulary = taxonomy_vocabulary_machine_name_load($vocabulary_name)) {
+    $tree = taxonomy_get_tree($vocabulary->vid);
+    foreach ($tree as $term) {
+      if ($term->name == $term_name) {
+        return $term->tid;
+      }
+    }
+  }
+
+  return FALSE;
+}
+
 function behance_node_presave($node) {
 
   // DEFINING PHP VARIABLES FROM DRUPAL VARIABLES
@@ -85,6 +106,7 @@ function behance_node_presave($node) {
   foreach($be_api_projects as $single_project):
     if($node->type == 'behance' && ($node->is_new == true || $node->timestamp < $single_project->modified_on)) {
       // CHECKING ERRORS
+      $temptid = Array();
       if(empty($behance_app_id) || empty($behance_api_key)) {
         drupal_set_message(t('Your APP ID or your API key for Behance is empty.'), 'error');
         return;
@@ -106,12 +128,18 @@ function behance_node_presave($node) {
         $node->language = 'und';
         $node->field_behance_author[LANGUAGE_NONE][0]['value'] = $author;
         $node->field_behance_id[LANGUAGE_NONE][0]['value'] = $project->id;
-        //$node->field_creative_fields[LANGUAGE_NONE][]['value'] = $project->fields;
-        //die(var_dump($project->fields));
         $vid = db_query("SELECT vid FROM {taxonomy_vocabulary} WHERE machine_name = 'creative_fields'")->fetchField();
+        $vocabulary = 'creative_fields';
         foreach ($project->fields as $field) {
-          $tid = custom_create_taxonomy_term($field, $vid);
-          $node->field_creative_fields['und'][0] = array('tid' => $tid);
+          $tid = _get_term_from_name($field, $vocabulary);
+          $term = new stdClass();
+          $term->name = $field;
+          $term->vid = $vid;
+          if(isset($tid)) {
+            $term->tid = $tid; // if I remove this line the term is created
+          }
+          taxonomy_term_save($term);
+          $node->field_creative_fields['und'][0] = array('tid' => $term->tid);
         }
         // PER PROJECT INFO TO BE UPDATED
         $be_api_single_project = $be_api->getProject($project->id);
@@ -141,6 +169,17 @@ function behance_node_presave($node) {
         endforeach;
         $node->field_appreciation[LANGUAGE_NONE][]['value'] = $project->stats->appreciations;
         node_save($node);
+
+        // foreach($temptid as $term_id) {
+        //   $taxonomy_term = taxonomy_term_load($term_id);
+        //   if($taxonomy_term != FALSE)
+        //   {
+        //       $column_name = 'nid'; // Or 'target_id' if you're using entity reference
+
+        //       $taxonomy_term->field_creative_fields[LANGUAGE_NONE][0][$column_name] = $node->nid;
+        //       taxonomy_term_save($taxonomy_term);
+        //   }
+        // }
       }
     }
   endforeach;
